@@ -1,176 +1,243 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local UserInputService = game:GetService("UserInputService")
+
 -- Create ScreenGui
-local player = game.Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "SimpleUtilityGui"
-screenGui.Parent = playerGui
+screenGui.Name = "TheGamerPointGui"
+screenGui.Parent = PlayerGui
 
--- Create Credits Label
+-- Main Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 320, 0, 250)
+mainFrame.Position = UDim2.new(0.5, -160, 0.5, -125)
+mainFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
+mainFrame.Active = true -- required for dragging
+mainFrame.Draggable = true
+
+-- Top bar for dragging
+local topBar = Instance.new("Frame")
+topBar.Size = UDim2.new(1, 0, 0, 30)
+topBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+topBar.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -60, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.Text = "TheGamerPoint GUI"
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = topBar
+
+-- Close Button
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 50, 1, 0)
+closeButton.Position = UDim2.new(1, -50, 0, 0)
+closeButton.BackgroundColor3 = Color3.fromRGB(170, 50, 50)
+closeButton.TextColor3 = Color3.new(1, 1, 1)
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextSize = 18
+closeButton.Text = "X"
+closeButton.Parent = topBar
+
+closeButton.MouseButton1Click:Connect(function()
+    screenGui.Enabled = false
+end)
+
+-- Credits Label
 local creditsLabel = Instance.new("TextLabel")
-creditsLabel.Size = UDim2.new(0, 300, 0, 30)
-creditsLabel.Position = UDim2.new(0, 10, 0, 10)
-creditsLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-creditsLabel.TextColor3 = Color3.new(1, 1, 1)
+creditsLabel.Size = UDim2.new(1, 0, 0, 20)
+creditsLabel.Position = UDim2.new(0, 0, 1, -20)
+creditsLabel.BackgroundTransparency = 1
+creditsLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+creditsLabel.Font = Enum.Font.Gotham
+creditsLabel.TextSize = 14
 creditsLabel.Text = "Made by TheGamerPoint"
-creditsLabel.Parent = screenGui
+creditsLabel.Parent = mainFrame
 
--- Create Fly Button
-local flyButton = Instance.new("TextButton")
-flyButton.Size = UDim2.new(0, 150, 0, 50)
-flyButton.Position = UDim2.new(0, 10, 0, 50)
-flyButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-flyButton.TextColor3 = Color3.new(1, 1, 1)
-flyButton.Text = "Toggle Fly"
-flyButton.Parent = screenGui
+-- Buttons Style
+local function createButton(text, positionY)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 280, 0, 40)
+    btn.Position = UDim2.new(0, 20, 0, positionY)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.BorderSizePixel = 0
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 18
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Text = text
+    btn.Parent = mainFrame
+    return btn
+end
 
--- Create Teleport Button
-local teleportButton = Instance.new("TextButton")
-teleportButton.Size = UDim2.new(0, 150, 0, 50)
-teleportButton.Position = UDim2.new(0, 170, 0, 50)
-teleportButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-teleportButton.TextColor3 = Color3.new(1, 1, 1)
-teleportButton.Text = "Teleport to Player"
-teleportButton.Parent = screenGui
+local flyButton = createButton("Toggle Fly (Off)", 50)
+local teleportButton = createButton("Teleport to Player", 100)
+local speedButton = createButton("Set WalkSpeed", 150)
 
--- Create WalkSpeed Button
-local speedButton = Instance.new("TextButton")
-speedButton.Size = UDim2.new(0, 150, 0, 50)
-speedButton.Position = UDim2.new(0, 10, 0, 110)
-speedButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-speedButton.TextColor3 = Color3.new(1, 1, 1)
-speedButton.Text = "Set WalkSpeed"
-speedButton.Parent = screenGui
-
--- Fly script variables
+-- Flying Variables
 local flying = false
-local player = game.Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-local UIS = game:GetService("UserInputService")
-
 local flySpeed = 50
-local flyVelocity = Instance.new("BodyVelocity")
-flyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-flyVelocity.Velocity = Vector3.new(0, 0, 0)
-flyVelocity.Parent = rootPart
+local bodyVelocity = nil
+local flyConnection1, flyConnection2
 
-local flyDirection = Vector3.new(0,0,0)
+local function startFlying()
+    if flying then return end
+    flying = true
+    flyButton.Text = "Toggle Fly (On)"
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.Parent = rootPart
+    humanoid.PlatformStand = true
 
--- Function to update flying velocity
-local function updateFly()
-    flyVelocity.Velocity = flyDirection * flySpeed
+    local direction = Vector3.new(0,0,0)
+    local function updateVelocity()
+        bodyVelocity.Velocity = direction * flySpeed
+    end
+
+    flyConnection1 = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode.W then
+            direction = direction + workspace.CurrentCamera.CFrame.LookVector
+        elseif input.KeyCode == Enum.KeyCode.S then
+            direction = direction - workspace.CurrentCamera.CFrame.LookVector
+        elseif input.KeyCode == Enum.KeyCode.A then
+            direction = direction - workspace.CurrentCamera.CFrame.RightVector
+        elseif input.KeyCode == Enum.KeyCode.D then
+            direction = direction + workspace.CurrentCamera.CFrame.RightVector
+        elseif input.KeyCode == Enum.KeyCode.Space then
+            direction = direction + Vector3.new(0, 1, 0)
+        elseif input.KeyCode == Enum.KeyCode.LeftControl then
+            direction = direction - Vector3.new(0, 1, 0)
+        end
+        updateVelocity()
+    end)
+
+    flyConnection2 = UserInputService.InputEnded:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode.W then
+            direction = direction - workspace.CurrentCamera.CFrame.LookVector
+        elseif input.KeyCode == Enum.KeyCode.S then
+            direction = direction + workspace.CurrentCamera.CFrame.LookVector
+        elseif input.KeyCode == Enum.KeyCode.A then
+            direction = direction + workspace.CurrentCamera.CFrame.RightVector
+        elseif input.KeyCode == Enum.KeyCode.D then
+            direction = direction - workspace.CurrentCamera.CFrame.RightVector
+        elseif input.KeyCode == Enum.KeyCode.Space then
+            direction = direction - Vector3.new(0, 1, 0)
+        elseif input.KeyCode == Enum.KeyCode.LeftControl then
+            direction = direction + Vector3.new(0, 1, 0)
+        end
+        updateVelocity()
+    end)
 end
 
--- Toggle flying function
+local function stopFlying()
+    flying = false
+    flyButton.Text = "Toggle Fly (Off)"
+    humanoid.PlatformStand = false
+    if bodyVelocity then
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
+    end
+    if flyConnection1 then flyConnection1:Disconnect() flyConnection1 = nil end
+    if flyConnection2 then flyConnection2:Disconnect() flyConnection2 = nil end
+end
+
 flyButton.MouseButton1Click:Connect(function()
-    flying = not flying
     if flying then
-        flyVelocity.Parent = rootPart
-        flyDirection = Vector3.new(0,0,0)
-        humanoid.PlatformStand = true -- disables normal controls
-        -- Listen for input to fly
-        local conn
-        conn = UIS.InputBegan:Connect(function(input, gpe)
-            if gpe then return end
-            if input.KeyCode == Enum.KeyCode.W then
-                flyDirection = flyDirection + workspace.CurrentCamera.CFrame.LookVector
-            elseif input.KeyCode == Enum.KeyCode.S then
-                flyDirection = flyDirection - workspace.CurrentCamera.CFrame.LookVector
-            elseif input.KeyCode == Enum.KeyCode.A then
-                flyDirection = flyDirection - workspace.CurrentCamera.CFrame.RightVector
-            elseif input.KeyCode == Enum.KeyCode.D then
-                flyDirection = flyDirection + workspace.CurrentCamera.CFrame.RightVector
-            elseif input.KeyCode == Enum.KeyCode.Space then
-                flyDirection = flyDirection + Vector3.new(0, 1, 0)
-            elseif input.KeyCode == Enum.KeyCode.LeftControl then
-                flyDirection = flyDirection - Vector3.new(0, 1, 0)
-            end
-            updateFly()
-        end)
-        local conn2
-        conn2 = UIS.InputEnded:Connect(function(input, gpe)
-            if gpe then return end
-            if input.KeyCode == Enum.KeyCode.W then
-                flyDirection = flyDirection - workspace.CurrentCamera.CFrame.LookVector
-            elseif input.KeyCode == Enum.KeyCode.S then
-                flyDirection = flyDirection + workspace.CurrentCamera.CFrame.LookVector
-            elseif input.KeyCode == Enum.KeyCode.A then
-                flyDirection = flyDirection + workspace.CurrentCamera.CFrame.RightVector
-            elseif input.KeyCode == Enum.KeyCode.D then
-                flyDirection = flyDirection - workspace.CurrentCamera.CFrame.RightVector
-            elseif input.KeyCode == Enum.KeyCode.Space then
-                flyDirection = flyDirection - Vector3.new(0, 1, 0)
-            elseif input.KeyCode == Enum.KeyCode.LeftControl then
-                flyDirection = flyDirection + Vector3.new(0, 1, 0)
-            end
-            updateFly()
-        end)
-
-        -- Disconnect flying when toggle off
-        flyButton.MouseButton1Click:Wait()
-        flying = false
-        flyVelocity.Parent = nil
-        humanoid.PlatformStand = false
-        conn:Disconnect()
-        conn2:Disconnect()
-
+        stopFlying()
     else
-        flying = false
-        flyVelocity.Parent = nil
-        humanoid.PlatformStand = false
+        startFlying()
     end
 end)
 
--- Teleport to player
-teleportButton.MouseButton1Click:Connect(function()
-    -- Show a simple InputDialog to enter player name
-    local input = Instance.new("TextBox")
-    input.Size = UDim2.new(0, 200, 0, 30)
-    input.Position = UDim2.new(0.5, -100, 0.5, -15)
-    input.PlaceholderText = "Enter player name"
-    input.Parent = screenGui
-    input:CaptureFocus()
+-- Teleport to Player Dropdown
+local dropdownOpen = false
+local dropdownFrame
 
-    input.FocusLost:Connect(function(enterPressed)
-        if enterPressed then
-            local targetName = input.Text
-            local targetPlayer = game.Players:FindFirstChild(targetName)
-            if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                rootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0,5,0)
-            else
-                warn("Player not found or no character")
-            end
-            input:Destroy()
-        else
-            input:Destroy()
+teleportButton.MouseButton1Click:Connect(function()
+    if dropdownOpen then
+        dropdownFrame:Destroy()
+        dropdownOpen = false
+        return
+    end
+
+    dropdownOpen = true
+
+    dropdownFrame = Instance.new("Frame")
+    dropdownFrame.Size = UDim2.new(0, 280, 0, 150)
+    dropdownFrame.Position = teleportButton.Position + UDim2.new(0, 0, 0, 45)
+    dropdownFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    dropdownFrame.BorderSizePixel = 0
+    dropdownFrame.Parent = mainFrame
+
+    local layout = Instance.new("UIListLayout")
+    layout.Parent = dropdownFrame
+    layout.Padding = UDim.new(0, 5)
+
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            local playerBtn = Instance.new("TextButton")
+            playerBtn.Size = UDim2.new(1, -10, 0, 30)
+            playerBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+            playerBtn.BorderSizePixel = 0
+            playerBtn.TextColor3 = Color3.new(1,1,1)
+            playerBtn.Font = Enum.Font.Gotham
+            playerBtn.TextSize = 16
+            playerBtn.Text = plr.Name
+            playerBtn.Parent = dropdownFrame
+
+            playerBtn.MouseButton1Click:Connect(function()
+                if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    rootPart.CFrame = plr.Character.HumanoidRootPart.CFrame + Vector3.new(0,5,0)
+                end
+                dropdownFrame:Destroy()
+                dropdownOpen = false
+            end)
         end
-    end)
+    end
 end)
 
--- WalkSpeed button
+-- WalkSpeed input
 speedButton.MouseButton1Click:Connect(function()
-    -- Show input box for speed value
-    local input = Instance.new("TextBox")
-    input.Size = UDim2.new(0, 200, 0, 30)
-    input.Position = UDim2.new(0.5, -100, 0.5, -15)
-    input.PlaceholderText = "Enter WalkSpeed number"
-    input.Parent = screenGui
-    input:CaptureFocus()
+    -- Check if there's an input box already
+    if mainFrame:FindFirstChild("SpeedInput") then return end
 
-    input.FocusLost:Connect(function(enterPressed)
+    local inputBox = Instance.new("TextBox")
+    inputBox.Name = "SpeedInput"
+    inputBox.Size = UDim2.new(0, 200, 0, 30)
+    inputBox.Position = speedButton.Position + UDim2.new(0, 0, 0, 45)
+    inputBox.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    inputBox.TextColor3 = Color3.new(1,1,1)
+    inputBox.PlaceholderText = "Enter WalkSpeed (default 16)"
+    inputBox.Font = Enum.Font.Gotham
+    inputBox.TextSize = 18
+    inputBox.ClearTextOnFocus = false
+    inputBox.Parent = mainFrame
+    inputBox:CaptureFocus()
+
+    inputBox.FocusLost:Connect(function(enterPressed)
         if enterPressed then
-            local speed = tonumber(input.Text)
-            if speed and speed > 0 and speed <= 500 then
-                humanoid.WalkSpeed = speed
+            local val = tonumber(inputBox.Text)
+            if val and val > 0 and val <= 500 then
+                humanoid.WalkSpeed = val
             else
-                warn("Invalid speed value (1-500)")
+                humanoid.WalkSpeed = 16
             end
-            input:Destroy()
+            inputBox:Destroy()
         else
-            input:Destroy()
+            inputBox:Destroy()
         end
     end)
 end)
